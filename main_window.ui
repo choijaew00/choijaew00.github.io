@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>488</width>
+    <height>584</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,9 +18,9 @@
     <property name="geometry">
      <rect>
       <x>70</x>
-      <y>40</y>
-      <width>54</width>
-      <height>12</height>
+      <y>100</y>
+      <width>91</width>
+      <height>21</height>
      </rect>
     </property>
     <property name="text">
@@ -31,9 +31,9 @@
     <property name="geometry">
      <rect>
       <x>210</x>
-      <y>40</y>
-      <width>54</width>
-      <height>12</height>
+      <y>100</y>
+      <width>71</width>
+      <height>21</height>
      </rect>
     </property>
     <property name="text">
@@ -43,10 +43,10 @@
    <widget class="QPushButton" name="btn_refresh">
     <property name="geometry">
      <rect>
-      <x>320</x>
-      <y>40</y>
-      <width>75</width>
-      <height>23</height>
+      <x>310</x>
+      <y>90</y>
+      <width>91</width>
+      <height>41</height>
      </rect>
     </property>
     <property name="text">
@@ -57,7 +57,7 @@
     <property name="geometry">
      <rect>
       <x>63</x>
-      <y>121</y>
+      <y>181</y>
       <width>131</width>
       <height>161</height>
      </rect>
@@ -70,7 +70,7 @@
     <property name="geometry">
      <rect>
       <x>283</x>
-      <y>121</y>
+      <y>181</y>
       <width>131</width>
       <height>161</height>
      </rect>
@@ -79,30 +79,30 @@
      <string/>
     </property>
    </widget>
-   <widget class="QLabel" name="lbl_fan_lmg">
+   <widget class="QLabel" name="lbl_fan_led">
     <property name="geometry">
      <rect>
       <x>60</x>
-      <y>310</y>
+      <y>370</y>
       <width>141</width>
       <height>16</height>
      </rect>
     </property>
     <property name="text">
-     <string>TextLabel</string>
+     <string/>
     </property>
    </widget>
    <widget class="QLabel" name="lbl_heater_led">
     <property name="geometry">
      <rect>
       <x>280</x>
-      <y>310</y>
+      <y>370</y>
       <width>141</width>
       <height>16</height>
      </rect>
     </property>
     <property name="text">
-     <string>TextLabel</string>
+     <string/>
     </property>
    </widget>
   </widget>
@@ -111,7 +111,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>488</width>
      <height>22</height>
     </rect>
    </property>
