@@ -1,81 +1,136 @@
+# 라이브러리 Import 영역
 import sys
-import random
+import os
+import socket #TCP/IP 통신 담당
+import configparser #config.ini 읽기
+from errno import EWOULDBLOCK, EAGAIN
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QThread, pyqtSignal
 
-# [사수분 피드백 반영] 우리가 만든 log.py 모듈에서 로깅 매니저를 가져옵니다.
-from log import log_manager
+from log import log_manager #로그 저장(접속로그, 사용자 행동 로그, 오류 로그)
+
+# ============================================================================
+# [NetworkWorker 클래스]_1. UI 직원, 2. 통신 직원
+# ============================================================================
+class NetworkWorker(QThread):
+    data_received = pyqtSignal(int, int) # signal 영역 (통신 thread -> UI)
+    log_requested = pyqtSignal(str) # 통신 thread -> 로그창 -메시지 전달
+
+    def __init__(self, ip, port): # TCP 서버 연결
+        super().__init__()
+        self.server_ip = ip
+        self.server_port = port
+        self.client_socket = None
+        self.is_running = True
+
+    def force_refresh(self): #수동 새로고침 기능
+        """사용자가 새로고침을 누르면 서버에 신호를 보내고 즉시 받아옵니다."""
+        if self.client_socket is None:
+            return
+
+        try:
+            self.log_requested.emit("🔄 서버에 최신 데이터 즉시 요청 중 (REQ 발송)...")
+
+            # 1. 서버에게 "나 지금 새로고침 눌렀으니 데이터 줘!" 하고 REQ 패킷을 던짐.
+            self.client_socket.sendall(b"REQ\n")
+
+            # 2. 서버가 응답을 바로 줄 테니 소켓 버퍼를 읽는다.
+            # (잠시 논-블로킹으로 전환하여 안전하게 가로챔)
+            self.client_socket.setblocking(False)
+            raw_data = self.client_socket.recv(1024)
+            self.client_socket.setblocking(True)
+
+            if raw_data:
+                decoded_string = raw_data.decode('utf-8')
+                temp_str, humi_str = decoded_string.split(",")
+                self.data_received.emit(int(temp_str), int(humi_str))
+                self.log_requested.emit("🎯 수동 새로고침 즉시 반영 완료!")
+            else:
+                self.log_requested.emit("새로고침 실패: 서버 닫힘")
+
+        except socket.error as e:
+            if e.errno in (EWOULDBLOCK, EAGAIN):
+                # 서버가 REQ를 받고 처리하는 수 밀리초의 찰나의 순간에 버퍼가 잠시 비었을 때의 예외 처리
+                self.log_requested.emit("새로고침 요청 전송 완료. 서버의 즉시 응답을 대기합니다.")
+            else:
+                self.log_requested.emit(f"수동 새로고침 중 소켓 오류: {e}")
+            if self.client_socket:
+                self.client_socket.setblocking(True)
+        except Exception as e:
+            self.log_requested.emit(f"수동 새로고침 오류: {e}")
+            if self.client_socket:
+                self.client_socket.setblocking(True)
+
+    def run(self):
+        """10초 주기로 들어오는 자동 데이터 수신 루틴"""
+        try:
+            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.client_socket.settimeout(3.0)
+
+            self.log_requested.emit(f"서버 접속 시도 중... ({self.server_ip}:{self.server_port})")
+            self.client_socket.connect((self.server_ip, self.server_port))
+            self.log_requested.emit("서버 연결 성공! 10초 주기 자동 수신 및 수동 새로고침 대기 시작.")
+
+            self.client_socket.settimeout(None)
+
+            while self.is_running:
+                # 여기서 가만히 기다리다가 10초 주기로 오거나,
+                # 내가 강제로 REQ 날려서 서버가 즉시 던져준 데이터를 받습니다.
+                raw_data = self.client_socket.recv(1024)
+                if not raw_data:
+                    self.log_requested.emit("서버가 연결을 종료했습니다.")
+                    break
+
+                decoded_string = raw_data.decode('utf-8')
+                temp_str, humi_str = decoded_string.split(",")
+                self.data_received.emit(int(temp_str), int(humi_str))
+
+        except Exception as e:
+            self.log_requested.emit(f"통신 쓰레드 오류 발생: {e}")
+        finally: # 프로그램 종료시 소켓 정리
+            if self.client_socket:
+                self.client_socket.close()
+            self.log_requested.emit("통신 쓰레드가 안전하게 종료되었습니다.")
 
 
-class TempHumidityMonitor(QtWidgets.QMainWindow):
+# ============================================================================
+# [메인 UI 창 클래스] - 기존과 동일
+# ============================================================================
+class TempHumidityMonitor(QtWidgets.QMainWindow): # 메인 화면
     def __init__(self):
         super().__init__()
-        uic.loadUi('main_window.ui', self)
+        uic.loadUi('main_window.ui', self) #ui 생성 -> Qt designer 로 만든 main_window.ui 불러오기
 
-        # ------------------------------------------------------------------------
-        # [변수 초기화 단락]
-        # ------------------------------------------------------------------------
-        self.current_temp = 0
-        self.current_humi = 0
+        self.config_file_path = os.path.join("config", "config.ini")
+        config = configparser.ConfigParser()
+        config.read(self.config_file_path, encoding="utf-8") # config읽기:설정파일 읽기
+        self.server_ip = config.get("NETWORK", "SERVER_IP")
+        self.server_port = config.getint("NETWORK", "SERVER_PORT")
 
-        # ------------------------------------------------------------------------
-        # [UI 및 이미지 세팅 단락]
-        # ------------------------------------------------------------------------
+        log_manager.log_server_data(f"ConfigParser 로드 완료 -> IP: {self.server_ip}, PORT: {self.server_port}")
+
+        #이미지 로딩
         self.lbl_fan_img.setPixmap(QPixmap('fan.png').scaled(120, 120))
         self.lbl_heater_img.setPixmap(QPixmap('heater.png').scaled(120, 120))
+        self.btn_refresh.clicked.connect(self.on_refresh_button_clicked) # 버튼 이벤트 연결 -> 버튼 클릭 시 함수 실행
 
-        # ------------------------------------------------------------------------
-        # [이벤트 바인딩 및 타이머 세팅 단락]
-        # ------------------------------------------------------------------------
-        # 새로고침 버튼을 누르면 수동 갱신 함수 실행
-        self.btn_refresh.clicked.connect(self.on_refresh_button_clicked)
-
-        # 5초 자동 타이머 세팅
-        self.timer = QTimer(self)
-        self.timer.setInterval(5000)  # 5초
-        self.timer.timeout.connect(self.on_timer_timeout)
-        self.timer.start()
-
-        # 프로그램 실행 시 최초 1회 화면 자동 갱신
-        self.refresh_data()
         log_manager.log_server_data("시스템이 성공적으로 시작되었습니다.")
 
-    # ============================================================================
-    # [이벤트 핸들러 기능]
-    # ============================================================================
-    def on_refresh_button_clicked(self):
-        """사용자가 새로고침 버튼을 누르는 '행동'을 했을 때 발생하는 이벤트 함수"""
-        # [사용자 로그 분리 기록] 사용자가 수동으로 버튼을 눌렀음을 따로 남깁니다.
-        log_manager.log_user_action("사용자가 [새로고침] 버튼을 클릭하여 수동 갱신을 요청했습니다.")
-        self.refresh_data()
+        self.worker = NetworkWorker(self.server_ip, self.server_port) # 통신 thread 생성
+        self.worker.data_received.connect(self.process_received_data)
+        self.worker.log_requested.connect(log_manager.log_server_data)
+        self.worker.start()
 
-    def on_timer_timeout(self):
-        """5초 자동 타이머 주기가 완료되었을 때 발생하는 이벤트 함수"""
-        # 자동 타이머는 사용자가 누른 게 아니므로 사용자 로그를 남기지 않고 데이터만 갱신합니다.
-        self.refresh_data()
-
-    # ============================================================================
-    # [데이터 수집 관련 기능]
-    # ============================================================================
-    def get_randdata(self):
-        """가상의 온습도 데이터를 생성하는 함수"""
-        temp = random.randint(0, 35)
-        humi = random.randint(30, 80)
-        return temp, humi
-
-    # ============================================================================
-    # [화면 표시 및 출력 제어 관련 기능]
-    # ============================================================================
-    def update_condition_label(self, temp, humi):
-        """UI 라벨의 텍스트를 최신 데이터로 업데이트하는 함수"""
+    def process_received_data(self, temp, humi): # data 처리 영역
         self.lbl_temp.setText(f"온도: {temp} °C")
         self.lbl_humi.setText(f"습도: {humi} %")
+        fan_status, heater_status = self.set_fan_heater(temp)
+        log_message = f"데이터 적용 완료 ➡️ 온도: {temp}°C | 습도: {humi}%"
+        log_manager.log_server_data(log_message)
 
-    def set_fan_heater(self, temp):
-        """온도 값에 따라 선풍기와 히터의 LED 색상을 제어하고 현재 상태를 반환하는 함수"""
+    def set_fan_heater(self, temp): # 온도에 따라 상태 결정
         led_style_template = "background-color: {color}; border-radius: 5px; min-height: 20px;"
-
         if temp >= 26:
             fan_color, heater_color = "green", "red"
             fan_state, heater_state = "ON", "OFF"
@@ -88,28 +143,21 @@ class TempHumidityMonitor(QtWidgets.QMainWindow):
 
         self.lbl_fan_led.setStyleSheet(led_style_template.format(color=fan_color))
         self.lbl_heater_led.setStyleSheet(led_style_template.format(color=heater_color))
-
         return fan_state, heater_state
 
-    # ============================================================================
-    # [메인 컨트롤 로직]
-    # ============================================================================
-    def refresh_data(self):
-        """온습도 데이터를 갱신하고 상태를 파악하여 서버 로그로 전송하는 메인 핵심 함수"""
-        # 1. 데이터를 수집
-        self.current_temp, self.current_humi = self.get_randdata()
+    def on_refresh_button_clicked(self): # 사용자 이벤트 처리 영역 : 새로고침 버튼 처리 //
+        log_manager.log_user_action("사용자가 [새로고침] 버튼을 클릭했습니다. 서버에 최신 데이터를 즉시 요구합니다.")
+        self.worker.force_refresh()
 
-        # 2. 화면 글자를 업데이트
-        self.update_condition_label(self.current_temp, self.current_humi)
-
-        # 3. 온도 기반으로 LED 장치 출력 제어 및 현재 상태 변수 받기
-        fan_status, heater_status = self.set_fan_heater(self.current_temp)
-
-        # 4. [서버 로그 분리 기록] 수집된 순수 데이터와 장비 제어 상태는 서버 로그 파일에만 보냅니다.
-        log_message = f"데이터 수신 결과 -> 온도: {self.current_temp}°C | 습도: {self.current_humi}% | 선풍기: {fan_status} | 히터: {heater_status}"
-        log_manager.log_server_data(log_message)
+    def closeEvent(self, event): # 종료 처리 영역 : 프로그램 종료 시 정리
+        if self.worker.isRunning():
+            self.worker.is_running = False
+            self.worker.quit()
+            self.worker.wait()
+        event.accept()
 
 
+# 프로그램 시작 영역
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     monitor = TempHumidityMonitor()
