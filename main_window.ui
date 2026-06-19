@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>488</width>
-    <height>584</height>
+    <width>793</width>
+    <height>704</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,7 +18,7 @@
     <property name="geometry">
      <rect>
       <x>70</x>
-      <y>100</y>
+      <y>70</y>
       <width>91</width>
       <height>21</height>
      </rect>
@@ -30,8 +30,8 @@
    <widget class="QLabel" name="lbl_humi">
     <property name="geometry">
      <rect>
-      <x>210</x>
-      <y>100</y>
+      <x>280</x>
+      <y>70</y>
       <width>71</width>
       <height>21</height>
      </rect>
@@ -43,8 +43,8 @@
    <widget class="QPushButton" name="btn_refresh">
     <property name="geometry">
      <rect>
-      <x>310</x>
-      <y>90</y>
+      <x>470</x>
+      <y>60</y>
       <width>91</width>
       <height>41</height>
      </rect>
@@ -56,8 +56,8 @@
    <widget class="QLabel" name="lbl_fan_img">
     <property name="geometry">
      <rect>
-      <x>63</x>
-      <y>181</y>
+      <x>210</x>
+      <y>190</y>
       <width>131</width>
       <height>161</height>
      </rect>
@@ -69,8 +69,8 @@
    <widget class="QLabel" name="lbl_heater_img">
     <property name="geometry">
      <rect>
-      <x>283</x>
-      <y>181</y>
+      <x>440</x>
+      <y>200</y>
       <width>131</width>
       <height>161</height>
      </rect>
@@ -82,9 +82,9 @@
    <widget class="QLabel" name="lbl_fan_led">
     <property name="geometry">
      <rect>
-      <x>60</x>
-      <y>370</y>
-      <width>141</width>
+      <x>210</x>
+      <y>400</y>
+      <width>131</width>
       <height>16</height>
      </rect>
     </property>
@@ -95,8 +95,8 @@
    <widget class="QLabel" name="lbl_heater_led">
     <property name="geometry">
      <rect>
-      <x>280</x>
-      <y>370</y>
+      <x>430</x>
+      <y>400</y>
       <width>141</width>
       <height>16</height>
      </rect>
@@ -105,13 +105,36 @@
      <string/>
     </property>
    </widget>
+   <widget class="QPushButton" name="btn_analysis">
+    <property name="geometry">
+     <rect>
+      <x>630</x>
+      <y>60</y>
+      <width>91</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>로그 분석</string>
+    </property>
+   </widget>
+   <widget class="QWidget" name="graph_container" native="true">
+    <property name="geometry">
+     <rect>
+      <x>50</x>
+      <y>440</y>
+      <width>701</width>
+      <height>221</height>
+     </rect>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>488</width>
+     <width>793</width>
      <height>22</height>
     </rect>
    </property>
